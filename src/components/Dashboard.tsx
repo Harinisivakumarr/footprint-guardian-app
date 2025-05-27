@@ -48,7 +48,8 @@ const Dashboard = ({ user, carbonEntries = [] }: DashboardProps) => {
       icon: Leaf,
       color: 'text-green-600',
       bgColor: 'bg-green-100',
-      change: `${stats.totalEntries} entries`
+      change: `${stats.totalEntries} entries`,
+      progress: user?.monthlyTarget ? (stats.totalCO2Saved / user.monthlyTarget) * 100 : 0
     },
     {
       title: 'Green Points',
@@ -56,7 +57,8 @@ const Dashboard = ({ user, carbonEntries = [] }: DashboardProps) => {
       icon: Trophy,
       color: 'text-yellow-600',
       bgColor: 'bg-yellow-100',
-      change: '+' + Math.floor((user?.greenPoints || 0) / 10) + ' this week'
+      change: '+' + Math.floor((user?.greenPoints || 0) / 10) + ' this week',
+      streak: user?.activityStreak || 0
     },
     {
       title: 'Weekly Progress',
@@ -64,15 +66,17 @@ const Dashboard = ({ user, carbonEntries = [] }: DashboardProps) => {
       icon: Target,
       color: 'text-blue-600',
       bgColor: 'bg-blue-100',
-      change: stats.weeklyProgress >= 85 ? 'On track' : 'Needs attention'
+      change: stats.weeklyProgress >= 85 ? 'On track' : 'Needs attention',
+      target: user?.weeklyTarget || 20
     },
     {
-      title: 'Total Entries',
-      value: stats.totalEntries,
+      title: 'Total Saved',
+      value: `${user?.totalCO2Saved?.toFixed(1) || '0.0'} kg`,
       icon: TrendingDown,
       color: 'text-purple-600',
       bgColor: 'bg-purple-100',
-      change: 'All time'
+      change: 'All time',
+      badges: user?.badgesEarned?.length || 0
     }
   ];
 
@@ -106,6 +110,11 @@ const Dashboard = ({ user, carbonEntries = [] }: DashboardProps) => {
           Welcome back, {user?.displayName || 'Eco Warrior'}! 🌱
         </h1>
         <p className="text-gray-600">Here's your environmental impact overview</p>
+        {user?.activityStreak && user.activityStreak > 0 && (
+          <p className="text-sm text-green-600 font-medium">
+            🔥 {user.activityStreak} day streak! Keep it up!
+          </p>
+        )}
       </div>
 
       {/* Stats Grid */}
@@ -114,10 +123,32 @@ const Dashboard = ({ user, carbonEntries = [] }: DashboardProps) => {
           <Card key={index} className="hover:shadow-lg transition-shadow">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
-                <div>
+                <div className="flex-1">
                   <p className="text-sm font-medium text-gray-600">{stat.title}</p>
                   <p className="text-2xl font-bold text-gray-900">{stat.value}</p>
                   <p className="text-sm text-gray-500 mt-1">{stat.change}</p>
+                  
+                  {/* Additional metrics */}
+                  {stat.progress !== undefined && (
+                    <div className="mt-2">
+                      <Progress value={Math.min(stat.progress, 100)} className="h-2" />
+                      <p className="text-xs text-gray-500 mt-1">
+                        Target: {user?.monthlyTarget}kg/month
+                      </p>
+                    </div>
+                  )}
+                  
+                  {stat.streak !== undefined && stat.streak > 0 && (
+                    <p className="text-xs text-orange-600 mt-1">
+                      🔥 {stat.streak} day streak
+                    </p>
+                  )}
+                  
+                  {stat.badges !== undefined && (
+                    <p className="text-xs text-purple-600 mt-1">
+                      🏆 {stat.badges} badges earned
+                    </p>
+                  )}
                 </div>
                 <div className={`${stat.bgColor} p-3 rounded-full`}>
                   <stat.icon className={`${stat.color}`} size={24} />
@@ -224,7 +255,7 @@ const Dashboard = ({ user, carbonEntries = [] }: DashboardProps) => {
             <div className="flex justify-between items-center">
               <span className="text-sm font-medium">Weekly Tracking Goal</span>
               <span className="text-sm text-gray-500">
-                {stats.totalCO2Saved.toFixed(1)}/20 kg CO₂ tracked
+                {stats.totalCO2Saved.toFixed(1)}/{user?.weeklyTarget || 20} kg CO₂ tracked
               </span>
             </div>
             <Progress value={stats.weeklyProgress} className="h-3" />

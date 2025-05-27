@@ -15,7 +15,9 @@ service cloud.firestore {
     
     // Allow users to query their own carbon entries
     match /carbonEntries/{entryId} {
-      allow list: if request.auth != null && request.auth.uid == request.query.where[0][2];
+      allow list: if request.auth != null && 
+        request.auth.uid in resource.data.keys() || 
+        request.auth.uid == request.query.where[0][2];
     }
   }
 }

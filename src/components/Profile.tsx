@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -7,21 +7,75 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
-import { Calendar, MapPin, Leaf, Target, Edit2, Save, X } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
+import { Calendar, MapPin, Leaf, Target, Edit2, Save, X, Bell, Mail, TrendingUp } from 'lucide-react';
+import { UserProfile } from '@/services/authService';
+import { carbonService } from '@/services/carbonService';
 
 interface ProfileProps {
-  user?: any;
+  user?: UserProfile;
   onUpdateProfile?: (data: any) => void;
 }
 
 const Profile = ({ user, onUpdateProfile }: ProfileProps) => {
   const [isEditing, setIsEditing] = useState(false);
+  const [recentActivities, setRecentActivities] = useState<any[]>([]);
+  const [isLoadingActivities, setIsLoadingActivities] = useState(true);
   const [formData, setFormData] = useState({
     displayName: user?.displayName || '',
     bio: user?.bio || '',
     location: user?.location || '',
     carbonGoal: user?.carbonGoal || '',
+    weeklyTarget: user?.weeklyTarget || 20,
+    monthlyTarget: user?.monthlyTarget || 80,
+    preferences: {
+      emailNotifications: user?.preferences?.emailNotifications ?? true,
+      weeklyReports: user?.preferences?.weeklyReports ?? true,
+      dailyTips: user?.preferences?.dailyTips ?? true,
+    }
   });
+
+  useEffect(() => {
+    setFormData({
+      displayName: user?.displayName || '',
+      bio: user?.bio || '',
+      location: user?.location || '',
+      carbonGoal: user?.carbonGoal || '',
+      weeklyTarget: user?.weeklyTarget || 20,
+      monthlyTarget: user?.monthlyTarget || 80,
+      preferences: {
+        emailNotifications: user?.preferences?.emailNotifications ?? true,
+        weeklyReports: user?.preferences?.weeklyReports ?? true,
+        dailyTips: user?.preferences?.dailyTips ?? true,
+      }
+    });
+  }, [user]);
+
+  useEffect(() => {
+    const loadRecentActivities = async () => {
+      if (!user?.uid) return;
+      
+      setIsLoadingActivities(true);
+      try {
+        const entries = await carbonService.getUserCarbonEntries(user.uid);
+        const recentEntries = entries.slice(0, 5).map(entry => ({
+          id: entry.id,
+          date: entry.date,
+          action: `${entry.activity} (${entry.category})`,
+          impact: `-${entry.co2Emission.toFixed(1)} kg CO₂`,
+          points: `+${Math.floor(entry.co2Emission * 2)} points`,
+          category: entry.category
+        }));
+        setRecentActivities(recentEntries);
+      } catch (error) {
+        console.error('Error loading recent activities:', error);
+      } finally {
+        setIsLoadingActivities(false);
+      }
+    };
+
+    loadRecentActivities();
+  }, [user?.uid]);
 
   const handleSave = () => {
     onUpdateProfile?.(formData);
@@ -34,47 +88,51 @@ const Profile = ({ user, onUpdateProfile }: ProfileProps) => {
       bio: user?.bio || '',
       location: user?.location || '',
       carbonGoal: user?.carbonGoal || '',
+      weeklyTarget: user?.weeklyTarget || 20,
+      monthlyTarget: user?.monthlyTarget || 80,
+      preferences: {
+        emailNotifications: user?.preferences?.emailNotifications ?? true,
+        weeklyReports: user?.preferences?.weeklyReports ?? true,
+        dailyTips: user?.preferences?.dailyTips ?? true,
+      }
     });
     setIsEditing(false);
   };
 
-  const activities = [
-    {
-      date: '2024-01-25',
-      action: 'Reduced car usage',
-      impact: '-5.2 kg CO₂',
-      points: '+25 points',
-      category: 'Transport'
+  const stats = [
+    { 
+      label: 'Total CO₂ Saved', 
+      value: `${user?.totalCO2Saved?.toFixed(1) || '0.0'} kg`, 
+      color: 'text-green-600',
+      icon: Leaf
     },
-    {
-      date: '2024-01-24',
-      action: 'Switched to renewable energy',
-      impact: '-12.8 kg CO₂',
-      points: '+50 points',
-      category: 'Energy'
+    { 
+      label: 'Green Points', 
+      value: user?.greenPoints || 0, 
+      color: 'text-yellow-600',
+      icon: Trophy
     },
-    {
-      date: '2024-01-23',
-      action: 'Composted organic waste',
-      impact: '-2.1 kg CO₂',
-      points: '+15 points',
-      category: 'Waste'
+    { 
+      label: 'Activity Streak', 
+      value: `${user?.activityStreak || 0} days`, 
+      color: 'text-blue-600',
+      icon: TrendingUp
     },
-    {
-      date: '2024-01-22',
-      action: 'Ate plant-based meal',
-      impact: '-3.4 kg CO₂',
-      points: '+20 points',
-      category: 'Food'
+    { 
+      label: 'Badges Earned', 
+      value: user?.badgesEarned?.length || 0, 
+      color: 'text-purple-600',
+      icon: Target
     },
   ];
 
-  const stats = [
-    { label: 'Total CO₂ Saved', value: '127.5 kg', color: 'text-green-600' },
-    { label: 'Green Points', value: '2,250', color: 'text-yellow-600' },
-    { label: 'Days Active', value: '45', color: 'text-blue-600' },
-    { label: 'Badges Earned', value: '8', color: 'text-purple-600' },
-  ];
+  const badgeColors = {
+    'newcomer': 'bg-green-100 text-green-800',
+    'google-user': 'bg-blue-100 text-blue-800',
+    'eco-warrior': 'bg-emerald-100 text-emerald-800',
+    'carbon-saver': 'bg-yellow-100 text-yellow-800',
+    'streak-master': 'bg-orange-100 text-orange-800',
+  };
 
   return (
     <div className="space-y-6">
@@ -132,13 +190,24 @@ const Profile = ({ user, onUpdateProfile }: ProfileProps) => {
                     </div>
                     
                     <div className="space-y-2">
-                      <Label htmlFor="carbonGoal">Monthly CO₂ Goal (kg)</Label>
+                      <Label htmlFor="weeklyTarget">Weekly Target (kg CO₂)</Label>
                       <Input
-                        id="carbonGoal"
+                        id="weeklyTarget"
                         type="number"
-                        value={formData.carbonGoal}
-                        onChange={(e) => setFormData({...formData, carbonGoal: e.target.value})}
-                        placeholder="e.g., 50"
+                        value={formData.weeklyTarget}
+                        onChange={(e) => setFormData({...formData, weeklyTarget: Number(e.target.value)})}
+                        placeholder="e.g., 20"
+                      />
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="monthlyTarget">Monthly Target (kg CO₂)</Label>
+                      <Input
+                        id="monthlyTarget"
+                        type="number"
+                        value={formData.monthlyTarget}
+                        onChange={(e) => setFormData({...formData, monthlyTarget: Number(e.target.value)})}
+                        placeholder="e.g., 80"
                       />
                     </div>
                     
@@ -151,6 +220,52 @@ const Profile = ({ user, onUpdateProfile }: ProfileProps) => {
                         placeholder="Tell us about your eco journey..."
                         rows={3}
                       />
+                    </div>
+                    
+                    {/* Preferences */}
+                    <div className="space-y-3">
+                      <Label>Notification Preferences</Label>
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-2">
+                            <Bell size={16} />
+                            <span className="text-sm">Email Notifications</span>
+                          </div>
+                          <Switch
+                            checked={formData.preferences.emailNotifications}
+                            onCheckedChange={(checked) => setFormData({
+                              ...formData,
+                              preferences: {...formData.preferences, emailNotifications: checked}
+                            })}
+                          />
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-2">
+                            <Mail size={16} />
+                            <span className="text-sm">Weekly Reports</span>
+                          </div>
+                          <Switch
+                            checked={formData.preferences.weeklyReports}
+                            onCheckedChange={(checked) => setFormData({
+                              ...formData,
+                              preferences: {...formData.preferences, weeklyReports: checked}
+                            })}
+                          />
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-2">
+                            <Leaf size={16} />
+                            <span className="text-sm">Daily Tips</span>
+                          </div>
+                          <Switch
+                            checked={formData.preferences.dailyTips}
+                            onCheckedChange={(checked) => setFormData({
+                              ...formData,
+                              preferences: {...formData.preferences, dailyTips: checked}
+                            })}
+                          />
+                        </div>
+                      </div>
                     </div>
                     
                     <Button onClick={handleSave} className="w-full bg-green-600 hover:bg-green-700">
@@ -177,17 +292,29 @@ const Profile = ({ user, onUpdateProfile }: ProfileProps) => {
                         </div>
                       )}
                       
-                      {formData.carbonGoal && (
-                        <div className="flex items-center space-x-2 text-sm text-gray-600">
-                          <Target size={16} />
-                          <span>Goal: {formData.carbonGoal} kg CO₂/month</span>
-                        </div>
-                      )}
+                      <div className="flex items-center space-x-2 text-sm text-gray-600">
+                        <Target size={16} />
+                        <span>Weekly: {user?.weeklyTarget || 20}kg • Monthly: {user?.monthlyTarget || 80}kg</span>
+                      </div>
                     </div>
                     
                     {formData.bio && (
                       <div className="p-3 bg-gray-50 rounded-lg">
                         <p className="text-sm text-gray-700">{formData.bio}</p>
+                      </div>
+                    )}
+                    
+                    {/* Badges */}
+                    {user?.badgesEarned && user.badgesEarned.length > 0 && (
+                      <div className="space-y-2">
+                        <p className="text-sm font-medium">Badges Earned</p>
+                        <div className="flex flex-wrap gap-2">
+                          {user.badgesEarned.map((badge, index) => (
+                            <Badge key={index} className={badgeColors[badge as keyof typeof badgeColors] || 'bg-gray-100 text-gray-800'}>
+                              {badge.replace('-', ' ')}
+                            </Badge>
+                          ))}
+                        </div>
                       </div>
                     )}
                   </div>
@@ -224,29 +351,43 @@ const Profile = ({ user, onUpdateProfile }: ProfileProps) => {
               <CardTitle>Recent Eco Activities</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                {activities.map((activity, index) => (
-                  <div key={index} className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 transition-colors">
-                    <div className="flex-1">
-                      <div className="flex items-center space-x-3">
-                        <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                        <div>
-                          <h3 className="font-medium text-gray-900">{activity.action}</h3>
-                          <p className="text-sm text-gray-500">
-                            {new Date(activity.date).toLocaleDateString()} • {activity.category}
-                          </p>
+              {isLoadingActivities ? (
+                <div className="space-y-4">
+                  {[1, 2, 3].map((i) => (
+                    <div key={i} className="animate-pulse">
+                      <div className="h-16 bg-gray-200 rounded-lg"></div>
+                    </div>
+                  ))}
+                </div>
+              ) : recentActivities.length > 0 ? (
+                <div className="space-y-4">
+                  {recentActivities.map((activity, index) => (
+                    <div key={index} className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 transition-colors">
+                      <div className="flex-1">
+                        <div className="flex items-center space-x-3">
+                          <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                          <div>
+                            <h3 className="font-medium text-gray-900">{activity.action}</h3>
+                            <p className="text-sm text-gray-500">
+                              {new Date(activity.date).toLocaleDateString()} • {activity.category}
+                            </p>
+                          </div>
                         </div>
                       </div>
+                      <div className="text-right space-y-1">
+                        <Badge variant="secondary" className="bg-green-100 text-green-700">
+                          {activity.impact}
+                        </Badge>
+                        <p className="text-sm text-yellow-600 font-medium">{activity.points}</p>
+                      </div>
                     </div>
-                    <div className="text-right space-y-1">
-                      <Badge variant="secondary" className="bg-green-100 text-green-700">
-                        {activity.impact}
-                      </Badge>
-                      <p className="text-sm text-yellow-600 font-medium">{activity.points}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center text-gray-500 py-8">
+                  <p>No activities yet. Start tracking your carbon footprint!</p>
+                </div>
+              )}
               
               <Button variant="outline" className="w-full mt-4">
                 View All Activities

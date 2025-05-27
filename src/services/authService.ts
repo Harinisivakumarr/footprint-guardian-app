@@ -1,3 +1,4 @@
+
 import { 
   createUserWithEmailAndPassword, 
   signInWithEmailAndPassword, 
@@ -19,6 +20,20 @@ export interface UserProfile {
   totalCO2Saved: number;
   joinedDate: string;
   carbonTarget?: number;
+  // Additional profile fields
+  bio?: string;
+  location?: string;
+  carbonGoal?: number;
+  weeklyTarget?: number;
+  monthlyTarget?: number;
+  badgesEarned: string[];
+  activityStreak: number;
+  lastActivity?: string;
+  preferences: {
+    emailNotifications: boolean;
+    weeklyReports: boolean;
+    dailyTips: boolean;
+  };
 }
 
 export const authService = {
@@ -31,15 +46,24 @@ export const authService = {
       // Update the user's display name
       await updateProfile(user, { displayName });
 
-      // Create user profile in Firestore
+      // Create comprehensive user profile in Firestore
       const userProfile: UserProfile = {
         uid: user.uid,
         email: user.email!,
         displayName,
-        greenPoints: 0,
+        greenPoints: 100, // Welcome bonus
         totalCO2Saved: 0,
         joinedDate: new Date().toISOString(),
-        carbonTarget: 50 // Default weekly target in kg CO2
+        carbonTarget: 50, // Default weekly target in kg CO2
+        weeklyTarget: 20,
+        monthlyTarget: 80,
+        badgesEarned: ['newcomer'],
+        activityStreak: 0,
+        preferences: {
+          emailNotifications: true,
+          weeklyReports: true,
+          dailyTips: true
+        }
       };
 
       await setDoc(doc(db, 'users', user.uid), userProfile);
@@ -103,10 +127,19 @@ export const authService = {
           email: user.email!,
           displayName: user.displayName || 'Eco Warrior',
           photoURL: user.photoURL || undefined,
-          greenPoints: 100, // Bonus points for Google login
+          greenPoints: 150, // Bonus points for Google login
           totalCO2Saved: 0,
           joinedDate: new Date().toISOString(),
-          carbonTarget: 50
+          carbonTarget: 50,
+          weeklyTarget: 20,
+          monthlyTarget: 80,
+          badgesEarned: ['newcomer', 'google-user'],
+          activityStreak: 0,
+          preferences: {
+            emailNotifications: true,
+            weeklyReports: true,
+            dailyTips: true
+          }
         };
 
         try {
