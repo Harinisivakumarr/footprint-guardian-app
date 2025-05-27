@@ -6,9 +6,11 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Leaf, Mail, Lock, User, Eye, EyeOff } from 'lucide-react';
+import { authService, UserProfile } from '@/services/authService';
+import { useToast } from '@/hooks/use-toast';
 
 interface AuthProps {
-  onLogin: (user: any) => void;
+  onLogin: (user: UserProfile) => void;
 }
 
 const Auth = ({ onLogin }: AuthProps) => {
@@ -24,64 +26,86 @@ const Auth = ({ onLogin }: AuthProps) => {
     password: '',
     confirmPassword: ''
   });
+  
+  const { toast } = useToast();
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     
-    // Simulate authentication delay
-    setTimeout(() => {
-      const mockUser = {
-        uid: '123',
-        email: loginData.email,
-        displayName: registerData.name || 'Eco Warrior',
-        greenPoints: 2250,
-        totalCO2Saved: 127.5,
-        joinedDate: '2024-01-01'
-      };
-      onLogin(mockUser);
+    try {
+      const user = await authService.login(loginData.email, loginData.password);
+      onLogin(user);
+      toast({
+        title: "Welcome back!",
+        description: "You have successfully logged in.",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Login failed",
+        description: error.message || "Please check your credentials and try again.",
+        variant: "destructive",
+      });
+    } finally {
       setIsLoading(false);
-    }, 1500);
+    }
   };
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
+    
     if (registerData.password !== registerData.confirmPassword) {
-      alert('Passwords do not match!');
+      toast({
+        title: "Password mismatch",
+        description: "Passwords do not match. Please try again.",
+        variant: "destructive",
+      });
       return;
     }
     
     setIsLoading(true);
     
-    setTimeout(() => {
-      const mockUser = {
-        uid: '123',
-        email: registerData.email,
-        displayName: registerData.name,
-        greenPoints: 0,
-        totalCO2Saved: 0,
-        joinedDate: new Date().toISOString()
-      };
-      onLogin(mockUser);
+    try {
+      const user = await authService.register(
+        registerData.email, 
+        registerData.password, 
+        registerData.name
+      );
+      onLogin(user);
+      toast({
+        title: "Account created!",
+        description: "Welcome to Ecofootprint! Start tracking your carbon footprint.",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Registration failed",
+        description: error.message || "Please try again with different credentials.",
+        variant: "destructive",
+      });
+    } finally {
       setIsLoading(false);
-    }, 1500);
+    }
   };
 
-  const handleGoogleLogin = () => {
+  const handleGoogleLogin = async () => {
     setIsLoading(true);
-    setTimeout(() => {
-      const mockUser = {
-        uid: 'google123',
-        email: 'user@gmail.com',
-        displayName: 'John Eco',
-        photoURL: 'https://via.placeholder.com/150',
-        greenPoints: 1500,
-        totalCO2Saved: 89.2,
-        joinedDate: '2023-12-01'
-      };
-      onLogin(mockUser);
+    
+    try {
+      const user = await authService.loginWithGoogle();
+      onLogin(user);
+      toast({
+        title: "Welcome!",
+        description: "You have successfully logged in with Google.",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Google login failed",
+        description: error.message || "Please try again.",
+        variant: "destructive",
+      });
+    } finally {
       setIsLoading(false);
-    }, 1500);
+    }
   };
 
   return (

@@ -1,41 +1,54 @@
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from 'recharts';
 import { Leaf, Trophy, Target, TrendingDown } from 'lucide-react';
+import { carbonService, DashboardStats } from '@/services/carbonService';
+import { UserProfile } from '@/services/authService';
 
 interface DashboardProps {
-  user?: any;
+  user?: UserProfile;
   carbonEntries?: any[];
 }
 
 const Dashboard = ({ user, carbonEntries = [] }: DashboardProps) => {
-  // Mock data for demonstration
-  const monthlyData = [
-    { month: 'Jan', emissions: 45, target: 40 },
-    { month: 'Feb', emissions: 38, target: 40 },
-    { month: 'Mar', emissions: 42, target: 40 },
-    { month: 'Apr', emissions: 35, target: 40 },
-    { month: 'May', emissions: 28, target: 40 },
-    { month: 'Jun', emissions: 32, target: 40 },
-  ];
+  const [stats, setStats] = useState<DashboardStats>({
+    totalEntries: 0,
+    totalCO2Saved: 0,
+    weeklyProgress: 0,
+    monthlyEmissions: [],
+    categoryBreakdown: []
+  });
+  const [isLoading, setIsLoading] = useState(true);
 
-  const categoryData = [
-    { name: 'Transport', value: 45, color: '#ef4444' },
-    { name: 'Energy', value: 30, color: '#f97316' },
-    { name: 'Food', value: 20, color: '#eab308' },
-    { name: 'Waste', value: 5, color: '#22c55e' },
-  ];
+  useEffect(() => {
+    const loadDashboardData = async () => {
+      if (!user?.uid) return;
+      
+      setIsLoading(true);
+      try {
+        const dashboardStats = await carbonService.getDashboardStats(user.uid);
+        setStats(dashboardStats);
+      } catch (error) {
+        console.error('Error loading dashboard data:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
 
-  const stats = [
+    loadDashboardData();
+  }, [user?.uid, carbonEntries]);
+
+  // Calculate dashboard metrics from real data
+  const dashboardMetrics = [
     {
-      title: 'CO₂ Saved This Month',
-      value: '12.5 kg',
+      title: 'CO₂ Tracked This Month',
+      value: `${stats.totalCO2Saved.toFixed(1)} kg`,
       icon: Leaf,
       color: 'text-green-600',
       bgColor: 'bg-green-100',
-      change: '+8%'
+      change: `${stats.totalEntries} entries`
     },
     {
       title: 'Green Points',
@@ -43,25 +56,48 @@ const Dashboard = ({ user, carbonEntries = [] }: DashboardProps) => {
       icon: Trophy,
       color: 'text-yellow-600',
       bgColor: 'bg-yellow-100',
-      change: '+25 this week'
+      change: '+' + Math.floor((user?.greenPoints || 0) / 10) + ' this week'
     },
     {
-      title: 'Monthly Target',
-      value: '85%',
+      title: 'Weekly Progress',
+      value: `${Math.round(stats.weeklyProgress)}%`,
       icon: Target,
       color: 'text-blue-600',
       bgColor: 'bg-blue-100',
-      change: 'On track'
+      change: stats.weeklyProgress >= 85 ? 'On track' : 'Needs attention'
     },
     {
-      title: 'Reduction Rate',
-      value: '23%',
+      title: 'Total Entries',
+      value: stats.totalEntries,
       icon: TrendingDown,
       color: 'text-purple-600',
       bgColor: 'bg-purple-100',
-      change: 'vs last month'
+      change: 'All time'
     }
   ];
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex flex-col space-y-2">
+          <h1 className="text-3xl font-bold text-gray-900">
+            Welcome back, {user?.displayName || 'Eco Warrior'}! 🌱
+          </h1>
+          <p className="text-gray-600">Loading your environmental impact overview...</p>
+        </div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {[1, 2, 3, 4].map((i) => (
+            <Card key={i} className="animate-pulse">
+              <CardContent className="p-6">
+                <div className="h-20 bg-gray-200 rounded"></div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -74,7 +110,7 @@ const Dashboard = ({ user, carbonEntries = [] }: DashboardProps) => {
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {stats.map((stat, index) => (
+        {dashboardMetrics.map((stat, index) => (
           <Card key={index} className="hover:shadow-lg transition-shadow">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
@@ -97,69 +133,83 @@ const Dashboard = ({ user, carbonEntries = [] }: DashboardProps) => {
         {/* Monthly Emissions Trend */}
         <Card>
           <CardHeader>
-            <CardTitle>Monthly CO₂ Emissions Trend</CardTitle>
+            <CardTitle>Monthly CO₂ Tracking Trend</CardTitle>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={monthlyData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="month" />
-                <YAxis />
-                <Tooltip />
-                <Line 
-                  type="monotone" 
-                  dataKey="emissions" 
-                  stroke="#ef4444" 
-                  strokeWidth={3}
-                  dot={{ fill: '#ef4444', strokeWidth: 2, r: 4 }}
-                />
-                <Line 
-                  type="monotone" 
-                  dataKey="target" 
-                  stroke="#22c55e" 
-                  strokeDasharray="5 5"
-                  strokeWidth={2}
-                />
-              </LineChart>
-            </ResponsiveContainer>
+            {stats.monthlyEmissions.length > 0 ? (
+              <ResponsiveContainer width="100%" height={300}>
+                <LineChart data={stats.monthlyEmissions}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="month" />
+                  <YAxis />
+                  <Tooltip />
+                  <Line 
+                    type="monotone" 
+                    dataKey="emissions" 
+                    stroke="#22c55e" 
+                    strokeWidth={3}
+                    dot={{ fill: '#22c55e', strokeWidth: 2, r: 4 }}
+                  />
+                  <Line 
+                    type="monotone" 
+                    dataKey="target" 
+                    stroke="#ef4444" 
+                    strokeDasharray="5 5"
+                    strokeWidth={2}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-300 flex items-center justify-center text-gray-500">
+                <p>Start tracking your carbon footprint to see trends!</p>
+              </div>
+            )}
           </CardContent>
         </Card>
 
         {/* Category Breakdown */}
         <Card>
           <CardHeader>
-            <CardTitle>Emissions by Category</CardTitle>
+            <CardTitle>Tracking by Category</CardTitle>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
-              <PieChart>
-                <Pie
-                  data={categoryData}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={60}
-                  outerRadius={120}
-                  paddingAngle={5}
-                  dataKey="value"
-                >
-                  {categoryData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
+            {stats.categoryBreakdown.length > 0 ? (
+              <>
+                <ResponsiveContainer width="100%" height={300}>
+                  <PieChart>
+                    <Pie
+                      data={stats.categoryBreakdown}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={60}
+                      outerRadius={120}
+                      paddingAngle={5}
+                      dataKey="value"
+                    >
+                      {stats.categoryBreakdown.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                  </PieChart>
+                </ResponsiveContainer>
+                <div className="mt-4 grid grid-cols-2 gap-2">
+                  {stats.categoryBreakdown.map((item, index) => (
+                    <div key={index} className="flex items-center space-x-2">
+                      <div 
+                        className="w-3 h-3 rounded-full" 
+                        style={{ backgroundColor: item.color }}
+                      ></div>
+                      <span className="text-sm text-gray-600">{item.name} ({item.value}kg)</span>
+                    </div>
                   ))}
-                </Pie>
-                <Tooltip />
-              </PieChart>
-            </ResponsiveContainer>
-            <div className="mt-4 grid grid-cols-2 gap-2">
-              {categoryData.map((item, index) => (
-                <div key={index} className="flex items-center space-x-2">
-                  <div 
-                    className="w-3 h-3 rounded-full" 
-                    style={{ backgroundColor: item.color }}
-                  ></div>
-                  <span className="text-sm text-gray-600">{item.name}</span>
                 </div>
-              ))}
-            </div>
+              </>
+            ) : (
+              <div className="h-300 flex items-center justify-center text-gray-500">
+                <p>Add carbon entries to see category breakdown!</p>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -167,17 +217,22 @@ const Dashboard = ({ user, carbonEntries = [] }: DashboardProps) => {
       {/* Weekly Progress */}
       <Card>
         <CardHeader>
-          <CardTitle>Weekly Progress</CardTitle>
+          <CardTitle>Weekly Tracking Progress</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
             <div className="flex justify-between items-center">
-              <span className="text-sm font-medium">Carbon Reduction Goal</span>
-              <span className="text-sm text-gray-500">17/20 kg CO₂</span>
+              <span className="text-sm font-medium">Weekly Tracking Goal</span>
+              <span className="text-sm text-gray-500">
+                {stats.totalCO2Saved.toFixed(1)}/20 kg CO₂ tracked
+              </span>
             </div>
-            <Progress value={85} className="h-3" />
+            <Progress value={stats.weeklyProgress} className="h-3" />
             <p className="text-sm text-gray-600">
-              You're 85% of the way to your weekly carbon reduction goal! Keep it up! 🎯
+              {stats.weeklyProgress >= 85 
+                ? "Great job! You're actively tracking your carbon footprint! 🎯"
+                : "Keep tracking your activities to reach your weekly goal! 🌱"
+              }
             </p>
           </div>
         </CardContent>
