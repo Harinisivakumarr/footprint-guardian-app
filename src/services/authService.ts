@@ -1,4 +1,3 @@
-
 import { 
   createUserWithEmailAndPassword, 
   signInWithEmailAndPassword, 
@@ -74,13 +73,31 @@ export const authService = {
   async loginWithGoogle(): Promise<UserProfile> {
     try {
       const provider = new GoogleAuthProvider();
+      
+      // Add additional scopes if needed
+      provider.addScope('profile');
+      provider.addScope('email');
+      
+      // Configure provider
+      provider.setCustomParameters({
+        prompt: 'select_account'
+      });
+
+      console.log('Starting Google authentication...');
       const userCredential = await signInWithPopup(auth, provider);
       const user = userCredential.user;
+      
+      console.log('Google auth successful, user:', {
+        uid: user.uid,
+        email: user.email,
+        displayName: user.displayName
+      });
 
       // Check if user profile exists, if not create one
       let userProfile = await this.getUserProfile(user.uid);
       
       if (!userProfile) {
+        console.log('Creating new user profile for Google user...');
         userProfile = {
           uid: user.uid,
           email: user.email!,
@@ -92,13 +109,39 @@ export const authService = {
           carbonTarget: 50
         };
 
-        await setDoc(doc(db, 'users', user.uid), userProfile);
+        try {
+          await setDoc(doc(db, 'users', user.uid), userProfile);
+          console.log('User profile created successfully in Firestore');
+        } catch (firestoreError) {
+          console.error('Error creating user profile in Firestore:', firestoreError);
+          // Still return the user profile even if Firestore fails
+          // The user can still use the app, just without persistent data
+        }
+      } else {
+        console.log('Existing user profile found:', userProfile);
       }
 
-      console.log('Google login successful:', userProfile);
       return userProfile;
-    } catch (error) {
-      console.error('Google login error:', error);
+    } catch (error: any) {
+      console.error('Google login error details:', {
+        code: error.code,
+        message: error.message,
+        details: error
+      });
+      
+      // Provide more specific error messages
+      if (error.code === 'auth/popup-closed-by-user') {
+        throw new Error('Google login was cancelled. Please try again.');
+      } else if (error.code === 'auth/popup-blocked') {
+        throw new Error('Popup was blocked. Please allow popups for this site and try again.');
+      } else if (error.code === 'auth/unauthorized-domain') {
+        throw new Error('This domain is not authorized for Google login. Please contact support.');
+      } else if (error.code === 'auth/operation-not-allowed') {
+        throw new Error('Google login is not enabled. Please contact support.');
+      } else if (error.code === 'permission-denied' || error.message.includes('permissions')) {
+        throw new Error('Unable to save user data. Please check your internet connection and try again.');
+      }
+      
       throw error;
     }
   },
