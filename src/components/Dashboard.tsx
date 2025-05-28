@@ -30,26 +30,39 @@ const Dashboard = ({ user, carbonEntries = [] }: DashboardProps) => {
       try {
         const dashboardStats = await carbonService.getDashboardStats(user.uid);
         setStats(dashboardStats);
+        console.log('Dashboard stats loaded:', dashboardStats);
       } catch (error) {
         console.error('Error loading dashboard data:', error);
+        // Set default stats if loading fails
+        setStats({
+          totalEntries: carbonEntries.length,
+          totalCO2Saved: user?.totalCO2Saved || 0,
+          weeklyProgress: 0,
+          monthlyEmissions: [],
+          categoryBreakdown: []
+        });
       } finally {
         setIsLoading(false);
       }
     };
 
     loadDashboardData();
-  }, [user?.uid, carbonEntries]);
+  }, [user?.uid, carbonEntries, user?.totalCO2Saved]);
 
-  // Calculate dashboard metrics from real data
+  // Calculate weekly progress from user's current total vs weekly target
+  const weeklyProgress = user?.weeklyTarget ? 
+    Math.min((stats.totalCO2Saved / user.weeklyTarget) * 100, 100) : 0;
+
+  // Calculate dashboard metrics from real user data
   const dashboardMetrics = [
     {
       title: 'CO₂ Tracked This Month',
-      value: `${stats.totalCO2Saved.toFixed(1)} kg`,
+      value: `${(user?.totalCO2Saved || 0).toFixed(1)} kg`,
       icon: Leaf,
       color: 'text-green-600',
       bgColor: 'bg-green-100',
       change: `${stats.totalEntries} entries`,
-      progress: user?.monthlyTarget ? (stats.totalCO2Saved / user.monthlyTarget) * 100 : 0
+      progress: user?.monthlyTarget ? ((user?.totalCO2Saved || 0) / user.monthlyTarget) * 100 : 0
     },
     {
       title: 'Green Points',
@@ -62,16 +75,16 @@ const Dashboard = ({ user, carbonEntries = [] }: DashboardProps) => {
     },
     {
       title: 'Weekly Progress',
-      value: `${Math.round(stats.weeklyProgress)}%`,
+      value: `${Math.round(weeklyProgress)}%`,
       icon: Target,
       color: 'text-blue-600',
       bgColor: 'bg-blue-100',
-      change: stats.weeklyProgress >= 85 ? 'On track' : 'Needs attention',
+      change: weeklyProgress >= 85 ? 'On track' : 'Needs attention',
       target: user?.weeklyTarget || 20
     },
     {
       title: 'Total Saved',
-      value: `${user?.totalCO2Saved?.toFixed(1) || '0.0'} kg`,
+      value: `${(user?.totalCO2Saved || 0).toFixed(1)} kg`,
       icon: TrendingDown,
       color: 'text-purple-600',
       bgColor: 'bg-purple-100',
@@ -255,12 +268,12 @@ const Dashboard = ({ user, carbonEntries = [] }: DashboardProps) => {
             <div className="flex justify-between items-center">
               <span className="text-sm font-medium">Weekly Tracking Goal</span>
               <span className="text-sm text-gray-500">
-                {stats.totalCO2Saved.toFixed(1)}/{user?.weeklyTarget || 20} kg CO₂ tracked
+                {(user?.totalCO2Saved || 0).toFixed(1)}/{user?.weeklyTarget || 20} kg CO₂ tracked
               </span>
             </div>
-            <Progress value={stats.weeklyProgress} className="h-3" />
+            <Progress value={weeklyProgress} className="h-3" />
             <p className="text-sm text-gray-600">
-              {stats.weeklyProgress >= 85 
+              {weeklyProgress >= 85 
                 ? "Great job! You're actively tracking your carbon footprint! 🎯"
                 : "Keep tracking your activities to reach your weekly goal! 🌱"
               }

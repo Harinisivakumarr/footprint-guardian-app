@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { onAuthStateChanged } from 'firebase/auth';
@@ -22,20 +21,76 @@ const Index = () => {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      setIsLoading(true);
+      
       if (firebaseUser) {
-        // User is signed in, get their profile
-        const userProfile = await authService.getUserProfile(firebaseUser.uid);
-        if (userProfile) {
+        console.log('Firebase user detected:', firebaseUser.uid);
+        
+        try {
+          // Get user profile from Firestore
+          let userProfile = await authService.getUserProfile(firebaseUser.uid);
+          
+          // If no profile exists, create one (backup safety net)
+          if (!userProfile) {
+            console.log('No user profile found, creating one...');
+            userProfile = {
+              uid: firebaseUser.uid,
+              email: firebaseUser.email!,
+              displayName: firebaseUser.displayName || 'Eco Warrior',
+              photoURL: firebaseUser.photoURL || undefined,
+              greenPoints: 100,
+              totalCO2Saved: 0,
+              joinedDate: new Date().toISOString(),
+              carbonTarget: 50,
+              weeklyTarget: 20,
+              monthlyTarget: 80,
+              badgesEarned: ['newcomer'],
+              activityStreak: 0,
+              preferences: {
+                emailNotifications: true,
+                weeklyReports: true,
+                dailyTips: true
+              }
+            };
+            
+            await authService.updateUserProfile(firebaseUser.uid, userProfile);
+          }
+          
           setUser(userProfile);
+          
           // Load user's carbon entries
           const entries = await carbonService.getUserCarbonEntries(firebaseUser.uid);
           setCarbonEntries(entries);
+          
+          console.log('User profile loaded:', userProfile);
+        } catch (error) {
+          console.error('Error loading user profile:', error);
+          // Set basic user info even if Firestore fails
+          setUser({
+            uid: firebaseUser.uid,
+            email: firebaseUser.email!,
+            displayName: firebaseUser.displayName || 'User',
+            greenPoints: 0,
+            totalCO2Saved: 0,
+            joinedDate: new Date().toISOString(),
+            weeklyTarget: 20,
+            monthlyTarget: 80,
+            badgesEarned: [],
+            activityStreak: 0,
+            preferences: {
+              emailNotifications: true,
+              weeklyReports: true,
+              dailyTips: true
+            }
+          });
         }
       } else {
         // User is signed out
+        console.log('No Firebase user detected');
         setUser(null);
         setCarbonEntries([]);
       }
+      
       setIsLoading(false);
     });
 
@@ -45,8 +100,12 @@ const Index = () => {
   const handleLogin = async (userData: UserProfile) => {
     setUser(userData);
     // Load user's carbon entries
-    const entries = await carbonService.getUserCarbonEntries(userData.uid);
-    setCarbonEntries(entries);
+    try {
+      const entries = await carbonService.getUserCarbonEntries(userData.uid);
+      setCarbonEntries(entries);
+    } catch (error) {
+      console.error('Error loading carbon entries:', error);
+    }
     console.log('User logged in:', userData);
   };
 
@@ -81,13 +140,23 @@ const Index = () => {
 
       setCarbonEntries(prev => [newEntry, ...prev]);
       
-      // Update user's green points in local state
+      // Update user's green points and total CO2 saved
       const points = Math.floor(entry.co2Emission * 2);
-      setUser(prev => prev ? {
-        ...prev,
-        greenPoints: prev.greenPoints + points,
-        totalCO2Saved: prev.totalCO2Saved + entry.co2Emission
-      } : null);
+      const updatedUser = {
+        ...user,
+        greenPoints: user.greenPoints + points,
+        totalCO2Saved: user.totalCO2Saved + entry.co2Emission,
+        lastActivity: new Date().toISOString()
+      };
+      
+      // Update in Firestore
+      await authService.updateUserProfile(user.uid, {
+        greenPoints: updatedUser.greenPoints,
+        totalCO2Saved: updatedUser.totalCO2Saved,
+        lastActivity: updatedUser.lastActivity
+      });
+      
+      setUser(updatedUser);
 
       console.log('Carbon entry added:', newEntry);
     } catch (error) {
@@ -104,6 +173,7 @@ const Index = () => {
       console.log('Profile updated:', profileData);
     } catch (error) {
       console.error('Error updating profile:', error);
+      throw error;
     }
   };
 

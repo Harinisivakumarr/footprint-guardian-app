@@ -83,7 +83,30 @@ export const authService = {
       const user = userCredential.user;
       
       // Get user profile from Firestore
-      const userProfile = await this.getUserProfile(user.uid);
+      let userProfile = await this.getUserProfile(user.uid);
+      
+      // If user profile doesn't exist (shouldn't happen for regular login), create one
+      if (!userProfile) {
+        userProfile = {
+          uid: user.uid,
+          email: user.email!,
+          displayName: user.displayName || 'User',
+          greenPoints: 100,
+          totalCO2Saved: 0,
+          joinedDate: new Date().toISOString(),
+          carbonTarget: 50,
+          weeklyTarget: 20,
+          monthlyTarget: 80,
+          badgesEarned: ['newcomer'],
+          activityStreak: 0,
+          preferences: {
+            emailNotifications: true,
+            weeklyReports: true,
+            dailyTips: true
+          }
+        };
+        await setDoc(doc(db, 'users', user.uid), userProfile);
+      }
       
       console.log('User logged in successfully:', userProfile);
       return userProfile;
@@ -147,11 +170,24 @@ export const authService = {
           console.log('User profile created successfully in Firestore');
         } catch (firestoreError) {
           console.error('Error creating user profile in Firestore:', firestoreError);
-          // Still return the user profile even if Firestore fails
-          // The user can still use the app, just without persistent data
+          throw new Error('Unable to save user data. Please check your internet connection and try again.');
         }
       } else {
         console.log('Existing user profile found:', userProfile);
+        
+        // Update last activity for existing users
+        const updatedProfile = {
+          ...userProfile,
+          lastActivity: new Date().toISOString()
+        };
+        
+        try {
+          await setDoc(doc(db, 'users', user.uid), updatedProfile, { merge: true });
+          userProfile = updatedProfile;
+        } catch (updateError) {
+          console.error('Error updating last activity:', updateError);
+          // Continue without error as this is not critical
+        }
       }
 
       return userProfile;

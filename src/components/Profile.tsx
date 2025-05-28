@@ -8,7 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
-import { Calendar, MapPin, Leaf, Target, Edit2, Save, X, Bell, Mail, TrendingUp } from 'lucide-react';
+import { Calendar, MapPin, Leaf, Target, Edit2, Save, X, Bell, Mail, TrendingUp, Trophy } from 'lucide-react';
 import { UserProfile } from '@/services/authService';
 import { carbonService } from '@/services/carbonService';
 
