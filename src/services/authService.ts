@@ -22,6 +22,9 @@ export interface UserProfile {
   email: string;
   displayName: string;
   photoURL?: string;
+  bio?: string;
+  location?: string;
+  carbonGoal?: string;
   greenPoints: number;
   totalCO2Saved: number;
   joinedDate: string;
