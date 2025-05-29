@@ -42,11 +42,15 @@ export const carbonService = {
 
       // Update user's total CO2 saved and green points
       const points = Math.floor(entry.co2Emission * 2); // 2 points per kg CO2
-      await updateDoc(doc(db, 'users', entry.userId), {
-        totalCO2Saved: increment(entry.co2Emission),
-        greenPoints: increment(points),
-        lastActivity: new Date().toISOString()
-      });
+      try {
+        await updateDoc(doc(db, 'users', entry.userId), {
+          totalCO2Saved: increment(entry.co2Emission),
+          greenPoints: increment(points),
+          lastActivity: new Date().toISOString()
+        });
+      } catch (userUpdateError) {
+        console.warn('Failed to update user stats, but entry was saved:', userUpdateError);
+      }
 
       console.log('Carbon entry added with ID:', docRef.id);
       return docRef.id;
@@ -76,6 +80,7 @@ export const carbonService = {
       return entries;
     } catch (error) {
       console.error('Error getting carbon entries:', error);
+      // Return empty array instead of throwing error to prevent app crashes
       return [];
     }
   },

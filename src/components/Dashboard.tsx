@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
@@ -25,15 +24,20 @@ const Dashboard = ({ user, carbonEntries = [] }: DashboardProps) => {
 
   useEffect(() => {
     const loadDashboardData = async () => {
-      if (!user?.uid) return;
+      if (!user?.uid) {
+        setIsLoading(false);
+        return;
+      }
       
       setIsLoading(true);
       try {
+        console.log('Loading dashboard data for user:', user.uid);
         const dashboardStats = await carbonService.getDashboardStats(user.uid);
         setStats(dashboardStats);
         console.log('Dashboard stats loaded:', dashboardStats);
       } catch (error) {
         console.error('Error loading dashboard data:', error);
+        // Set empty stats instead of keeping loading state
         setStats({
           totalEntries: 0,
           totalCO2Saved: 0,
@@ -49,16 +53,16 @@ const Dashboard = ({ user, carbonEntries = [] }: DashboardProps) => {
     loadDashboardData();
   }, [user?.uid, carbonEntries.length]);
 
-  // Calculate dashboard metrics from real user data
+  // Calculate dashboard metrics from real user data with fallbacks
   const dashboardMetrics = [
     {
       title: 'CO₂ Tracked This Month',
-      value: `${stats.totalCO2Saved.toFixed(1)} kg`,
+      value: `${(stats.totalCO2Saved || 0).toFixed(1)} kg`,
       icon: Leaf,
       color: 'text-green-600',
       bgColor: 'bg-green-100',
-      change: `${stats.totalEntries} entries`,
-      progress: user?.monthlyTarget ? (stats.totalCO2Saved / user.monthlyTarget) * 100 : 0
+      change: `${stats.totalEntries || 0} entries`,
+      progress: user?.monthlyTarget ? ((stats.totalCO2Saved || 0) / user.monthlyTarget) * 100 : 0
     },
     {
       title: 'Green Points',
@@ -71,16 +75,16 @@ const Dashboard = ({ user, carbonEntries = [] }: DashboardProps) => {
     },
     {
       title: 'Weekly Progress',
-      value: `${stats.weeklyProgress}%`,
+      value: `${stats.weeklyProgress || 0}%`,
       icon: Target,
       color: 'text-blue-600',
       bgColor: 'bg-blue-100',
-      change: stats.weeklyProgress >= 75 ? 'On track' : 'Needs attention',
+      change: (stats.weeklyProgress || 0) >= 75 ? 'On track' : 'Needs attention',
       target: user?.weeklyTarget || 20
     },
     {
       title: 'Total Tracked',
-      value: `${stats.totalCO2Saved.toFixed(1)} kg`,
+      value: `${(stats.totalCO2Saved || 0).toFixed(1)} kg`,
       icon: TrendingDown,
       color: 'text-purple-600',
       bgColor: 'bg-purple-100',
@@ -112,14 +116,24 @@ const Dashboard = ({ user, carbonEntries = [] }: DashboardProps) => {
     );
   }
 
+  if (!user) {
+    return (
+      <div className="space-y-6">
+        <div className="text-center py-12">
+          <h2 className="text-xl text-gray-600">Please log in to view your dashboard</h2>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col space-y-2">
         <h1 className="text-3xl font-bold text-gray-900">
-          Welcome back, {user?.displayName || 'Eco Warrior'}! 🌱
+          Welcome back, {user.displayName || 'Eco Warrior'}! 🌱
         </h1>
         <p className="text-gray-600">Here's your carbon footprint tracking overview</p>
-        {user?.activityStreak && user.activityStreak > 0 && (
+        {user.activityStreak && user.activityStreak > 0 && (
           <p className="text-sm text-green-600 font-medium">
             🔥 {user.activityStreak} day streak! Keep tracking!
           </p>
@@ -137,11 +151,11 @@ const Dashboard = ({ user, carbonEntries = [] }: DashboardProps) => {
                   <p className="text-2xl font-bold text-gray-900">{stat.value}</p>
                   <p className="text-sm text-gray-500 mt-1">{stat.change}</p>
                   
-                  {stat.progress !== undefined && (
+                  {stat.progress !== undefined && stat.progress > 0 && (
                     <div className="mt-2">
                       <Progress value={Math.min(stat.progress, 100)} className="h-2" />
                       <p className="text-xs text-gray-500 mt-1">
-                        Target: {user?.monthlyTarget}kg/month
+                        Target: {user.monthlyTarget}kg/month
                       </p>
                     </div>
                   )}
@@ -152,7 +166,7 @@ const Dashboard = ({ user, carbonEntries = [] }: DashboardProps) => {
                     </p>
                   )}
                   
-                  {stat.badges !== undefined && (
+                  {stat.badges !== undefined && stat.badges > 0 && (
                     <p className="text-xs text-purple-600 mt-1">
                       🏆 {stat.badges} badges earned
                     </p>
@@ -178,7 +192,7 @@ const Dashboard = ({ user, carbonEntries = [] }: DashboardProps) => {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {stats.monthlyEmissions.length > 0 ? (
+            {stats.monthlyEmissions && stats.monthlyEmissions.length > 0 ? (
               <ChartContainer
                 config={{
                   emissions: {
@@ -238,7 +252,7 @@ const Dashboard = ({ user, carbonEntries = [] }: DashboardProps) => {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {stats.categoryBreakdown.length > 0 ? (
+            {stats.categoryBreakdown && stats.categoryBreakdown.length > 0 ? (
               <>
                 <ChartContainer
                   config={{
@@ -310,18 +324,18 @@ const Dashboard = ({ user, carbonEntries = [] }: DashboardProps) => {
             <div className="flex justify-between items-center">
               <span className="text-sm font-medium">Weekly Tracking Goal</span>
               <span className="text-sm text-gray-500">
-                {stats.totalCO2Saved.toFixed(1)}/{user?.weeklyTarget || 20} kg CO₂ tracked
+                {(stats.totalCO2Saved || 0).toFixed(1)}/{user.weeklyTarget || 20} kg CO₂ tracked
               </span>
             </div>
-            <Progress value={Math.min(stats.weeklyProgress, 100)} className="h-4" />
+            <Progress value={Math.min(stats.weeklyProgress || 0, 100)} className="h-4" />
             <div className="flex justify-between text-sm">
-              <span className="text-gray-600">Progress: {stats.weeklyProgress}%</span>
-              <span className={`font-medium ${stats.weeklyProgress >= 75 ? 'text-green-600' : 'text-orange-600'}`}>
-                {stats.weeklyProgress >= 75 ? '🎯 On Track!' : '📈 Keep Going!'}
+              <span className="text-gray-600">Progress: {stats.weeklyProgress || 0}%</span>
+              <span className={`font-medium ${(stats.weeklyProgress || 0) >= 75 ? 'text-green-600' : 'text-orange-600'}`}>
+                {(stats.weeklyProgress || 0) >= 75 ? '🎯 On Track!' : '📈 Keep Going!'}
               </span>
             </div>
             <p className="text-sm text-gray-600">
-              {stats.weeklyProgress >= 75 
+              {(stats.weeklyProgress || 0) >= 75 
                 ? "Excellent! You're actively tracking your carbon footprint this week! 🌱"
                 : "Add more carbon tracking entries to reach your weekly goal! Every entry counts! 💪"
               }

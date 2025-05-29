@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { onAuthStateChanged } from 'firebase/auth';
@@ -27,44 +28,34 @@ const Index = () => {
         console.log('Firebase user detected:', firebaseUser.uid);
         
         try {
-          // Get user profile from Firestore
+          // Get or create user profile from Firestore
           let userProfile = await authService.getUserProfile(firebaseUser.uid);
           
-          // If no profile exists, create one (backup safety net)
+          // If no profile exists, create one (for existing users or OAuth users)
           if (!userProfile) {
             console.log('No user profile found, creating one...');
-            userProfile = {
-              uid: firebaseUser.uid,
+            userProfile = await authService.createUserProfile(firebaseUser.uid, {
               email: firebaseUser.email!,
               displayName: firebaseUser.displayName || 'Eco Warrior',
-              photoURL: firebaseUser.photoURL || undefined,
-              greenPoints: 100,
-              totalCO2Saved: 0,
-              joinedDate: new Date().toISOString(),
-              carbonTarget: 50,
-              weeklyTarget: 20,
-              monthlyTarget: 80,
-              badgesEarned: ['newcomer'],
-              activityStreak: 0,
-              preferences: {
-                emailNotifications: true,
-                weeklyReports: true,
-                dailyTips: true
-              }
-            };
-            
-            await authService.updateUserProfile(firebaseUser.uid, userProfile);
+              photoURL: firebaseUser.photoURL || undefined
+            });
           }
           
           setUser(userProfile);
           
           // Load user's carbon entries
-          const entries = await carbonService.getUserCarbonEntries(firebaseUser.uid);
-          setCarbonEntries(entries);
+          try {
+            const entries = await carbonService.getUserCarbonEntries(firebaseUser.uid);
+            setCarbonEntries(entries);
+            console.log('Carbon entries loaded:', entries.length);
+          } catch (error) {
+            console.error('Error loading carbon entries:', error);
+            setCarbonEntries([]);
+          }
           
           console.log('User profile loaded:', userProfile);
         } catch (error) {
-          console.error('Error loading user profile:', error);
+          console.error('Error loading/creating user profile:', error);
           // Set basic user info even if Firestore fails
           setUser({
             uid: firebaseUser.uid,
@@ -83,6 +74,7 @@ const Index = () => {
               dailyTips: true
             }
           });
+          setCarbonEntries([]);
         }
       } else {
         // User is signed out
@@ -103,8 +95,10 @@ const Index = () => {
     try {
       const entries = await carbonService.getUserCarbonEntries(userData.uid);
       setCarbonEntries(entries);
+      console.log('Carbon entries loaded after login:', entries.length);
     } catch (error) {
-      console.error('Error loading carbon entries:', error);
+      console.error('Error loading carbon entries after login:', error);
+      setCarbonEntries([]);
     }
     console.log('User logged in:', userData);
   };
@@ -149,13 +143,6 @@ const Index = () => {
         lastActivity: new Date().toISOString()
       };
       
-      // Update in Firestore
-      await authService.updateUserProfile(user.uid, {
-        greenPoints: updatedUser.greenPoints,
-        totalCO2Saved: updatedUser.totalCO2Saved,
-        lastActivity: updatedUser.lastActivity
-      });
-      
       setUser(updatedUser);
 
       console.log('Carbon entry added:', newEntry);
@@ -181,8 +168,8 @@ const Index = () => {
     return (
       <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-100 flex items-center justify-center">
         <div className="text-center space-y-4">
-          <div className="w-16 h-16 bg-gradient-to-r from-green-500 to-emerald-500 rounded-full flex items-center justify-center mx-auto">
-            <span className="text-white font-bold text-xl">E</span>
+          <div className="w-16 h-16 bg-gradient-to-r from-green-500 to-emerald-500 rounded-full flex items-center justify-center mx-auto animate-pulse">
+            <span className="text-white font-bold text-xl">🌱</span>
           </div>
           <p className="text-gray-600">Loading your eco journey...</p>
         </div>
